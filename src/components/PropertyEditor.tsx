@@ -5,19 +5,19 @@ import { useSimulation } from "../contexts/SimulationContext";
 export default function PropertyEditor() {
   const {
     universe,
-    selectedBobIndex,
+    selectedballIndex,
     isPropertyEditorOpen,
     setIsPropertyEditorOpen,
     render,
     setRender,
   } = useSimulation();
 
-  // Get the selected bob
-  const bob = useMemo(() => {
-    return selectedBobIndex !== null
-      ? universe.get_bob(selectedBobIndex)
+  // Get the selected ball
+  const ball = useMemo(() => {
+    return selectedballIndex !== null
+      ? universe.get_ball(selectedballIndex)
       : null;
-  }, [selectedBobIndex, universe, render]);
+  }, [selectedballIndex, universe, render]);
 
   // Check if mass calculation is enabled
   const isMassCalculationEnabled = universe.get_mass_calculation();
@@ -47,17 +47,17 @@ export default function PropertyEditor() {
   // Track if user is actively editing to prevent auto-formatting
   const [isEditing, setIsEditing] = useState<string | null>(null);
 
-  // Update local values when bob changes, but only if user is not actively editing
+  // Update local values when ball changes, but only if user is not actively editing
   useEffect(() => {
-    // console.log("Updating PropertyEditor values from bob:", bob);
-    if (!isEditing && bob) {
-      setAngleValue(((bob.theta * 180) / Math.PI).toFixed(2));
-      setOmegaValue(((bob.omega * 180) / Math.PI).toFixed(3));
-      setMassValue(bob.mass.toFixed(2));
-      setRodLengthValue(bob.rod ? bob.rod.length.toFixed(1) : "0");
-      setRadiusValue(bob.radius.toFixed(1));
+    // console.log("Updating PropertyEditor values from ball:", ball);
+    if (!isEditing && ball) {
+      setAngleValue(((ball.theta * 180) / Math.PI).toFixed(2));
+      setOmegaValue(((ball.omega * 180) / Math.PI).toFixed(3));
+      setMassValue(ball.mass.toFixed(2));
+      setRodLengthValue(ball.rod ? ball.rod.length.toFixed(1) : "0");
+      setRadiusValue(ball.radius.toFixed(1));
     }
-  }, [bob, selectedBobIndex, isEditing]); // Update when bob properties or index changes
+  }, [ball, selectedballIndex, isEditing]); // Update when ball properties or index changes
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -97,26 +97,26 @@ export default function PropertyEditor() {
 
   // Validation and update handlers
   const handlePropertyUpdate = (property: string, value: number) => {
-    if (selectedBobIndex === null) return;
+    if (selectedballIndex === null) return;
 
     switch (property) {
       case "theta":
-        universe.update_bob_theta(selectedBobIndex, value);
+        universe.update_ball_theta(selectedballIndex, value);
         break;
       case "omega":
-        universe.update_bob_omega(selectedBobIndex, value);
+        universe.update_ball_omega(selectedballIndex, value);
         break;
       case "mass":
-        universe.update_bob_mass(selectedBobIndex, value);
+        universe.update_ball_mass(selectedballIndex, value);
         break;
       case "rod_length":
-        universe.update_bob_length(selectedBobIndex, value);
+        universe.update_ball_length(selectedballIndex, value);
         break;
       case "radius":
-        universe.update_bob_radius(selectedBobIndex, value);
+        universe.update_ball_radius(selectedballIndex, value);
         break;
       case "color":
-        universe.update_bob_color(selectedBobIndex, value);
+        universe.update_ball_color(selectedballIndex, value);
         break;
     }
 
@@ -206,30 +206,47 @@ export default function PropertyEditor() {
     }
   };
 
-  if (!isPropertyEditorOpen || !bob) return null;
+  if (!isPropertyEditorOpen || !ball) return null;
 
   return (
     <div
       ref={editorRef}
-      className="fixed bg-white border border-gray-200 rounded-lg shadow-2xl pointer-events-auto max-h-3/4 overflow-y-auto"
+      className="fixed bg-white border border-gray-200 rounded-lg shadow-2xl pointer-events-auto max-h-[90vh] overflow-y-auto"
       style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: "400px",
-        minHeight: "500px",
+        left:
+          typeof window !== "undefined" && window.innerWidth < 640
+            ? "50%"
+            : `${position.x}px`,
+        top:
+          typeof window !== "undefined" && window.innerWidth < 640
+            ? "50%"
+            : `${position.y}px`,
+        transform:
+          typeof window !== "undefined" && window.innerWidth < 640
+            ? "translate(-50%, -50%)"
+            : "none",
+        width:
+          typeof window !== "undefined" && window.innerWidth < 640
+            ? "90vw"
+            : "400px",
+        maxWidth: "400px",
+        minHeight:
+          typeof window !== "undefined" && window.innerWidth < 640
+            ? "auto"
+            : "500px",
         zIndex: 1000,
       }}
     >
       {/* Header with drag handle and close button */}
-      <div className="flex sticky top-0 items-center justify-between p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+      <div className="flex sticky top-0 items-center justify-between p-2 sm:p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
         <div
           className="flex items-center gap-2 cursor-move flex-1"
           onMouseDown={handleDragStart}
         >
-          <GripVertical className="w-5 h-5 text-gray-400" />
-          <GripVertical className="w-5 h-5 text-gray-400 -ml-4" />
-          <h2 className="text-lg font-semibold text-gray-800 ml-2">
-            Edit Bob {selectedBobIndex !== null ? selectedBobIndex + 1 : 0}'s
+          <GripVertical className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 hidden sm:block" />
+          <GripVertical className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 -ml-4 hidden sm:block" />
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 sm:ml-2">
+            Edit Ball {selectedballIndex !== null ? selectedballIndex + 1 : 0}'s
             Properties
           </h2>
         </div>
@@ -242,7 +259,7 @@ export default function PropertyEditor() {
       </div>
 
       {/* Property fields */}
-      <div className="p-4 space-y-4">
+      <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
         {/* Angle θ */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -253,7 +270,7 @@ export default function PropertyEditor() {
             value={angleValue}
             onChange={(e) => handleAngleChange(e.target.value)}
             onBlur={() => setIsEditing(null)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            className={`w-full px-3 py-2.5 sm:py-2 text-base border rounded-md focus:outline-none focus:ring-2 ${
               angleError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-blue-500"
@@ -278,7 +295,7 @@ export default function PropertyEditor() {
             value={omegaValue}
             onChange={(e) => handleOmegaChange(e.target.value)}
             onBlur={() => setIsEditing(null)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            className={`w-full px-3 py-2.5 sm:py-2 text-base border rounded-md focus:outline-none focus:ring-2 ${
               omegaError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-blue-500"
@@ -303,7 +320,7 @@ export default function PropertyEditor() {
 
         {/* Mass m */}
         <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700 flex items-center gap-2 flex-wrap">
             Mass <span className="text-lg">m</span>:
             {!isMassCalculationEnabled && (
               <span className="text-xs text-gray-400 font-normal">
@@ -317,7 +334,7 @@ export default function PropertyEditor() {
             onChange={(e) => handleMassChange(e.target.value)}
             onBlur={() => setIsEditing(null)}
             disabled={!isMassCalculationEnabled}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            className={`w-full px-3 py-2.5 sm:py-2 text-base border rounded-md focus:outline-none focus:ring-2 ${
               massError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-blue-500"
@@ -335,7 +352,7 @@ export default function PropertyEditor() {
         </div>
 
         {/* Rod Length ℓ */}
-        {bob.rod && (
+        {ball.rod && (
           <div className="space-y-1">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
               Rod Length <span className="text-lg">ℓ</span>:
@@ -345,7 +362,7 @@ export default function PropertyEditor() {
               value={rodLengthValue}
               onChange={(e) => handleRodLengthChange(e.target.value)}
               onBlur={() => setIsEditing(null)}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+              className={`w-full px-3 py-2.5 sm:py-2 text-base border rounded-md focus:outline-none focus:ring-2 ${
                 rodLengthError
                   ? "border-red-500 focus:ring-red-500"
                   : "border-gray-300 focus:ring-blue-500"
@@ -371,7 +388,7 @@ export default function PropertyEditor() {
             value={radiusValue}
             onChange={(e) => handleRadiusChange(e.target.value)}
             onBlur={() => setIsEditing(null)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+            className={`w-full px-3 py-2.5 sm:py-2 text-base border rounded-md focus:outline-none focus:ring-2 ${
               radiusError
                 ? "border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:ring-blue-500"
@@ -392,8 +409,8 @@ export default function PropertyEditor() {
             Position:
           </label>
           <div className="text-sm text-gray-600">
-            <div>x: {bob.pos.x.toFixed(2)} px</div>
-            <div>y: {bob.pos.y.toFixed(2)} px</div>
+            <div>x: {ball.pos.x.toFixed(2)} px</div>
+            <div>y: {ball.pos.y.toFixed(2)} px</div>
           </div>
         </div>
       </div>

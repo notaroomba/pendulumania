@@ -102,7 +102,7 @@ pub struct Trail {
 
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
-pub struct Bob {
+pub struct Ball {
     pub pos: Vec2,
     pub omega: f64,
     pub theta: f64,
@@ -113,7 +113,7 @@ pub struct Bob {
     pub color: u32,
 }
 #[wasm_bindgen]
-impl Bob {
+impl Ball {
     #[wasm_bindgen(constructor)]
     pub fn new(
         px: f64,
@@ -126,8 +126,8 @@ impl Bob {
         radius: i32,
         mass: f64,
         color: u32
-    ) -> Bob {
-        Bob {
+    ) -> Ball {
+        Ball {
             pos: Vec2::new(px, py),
             omega,
             theta,
@@ -166,14 +166,14 @@ pub enum Implementation {
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Universe {
-    bobs: Vec<Bob>,
+    balls: Vec<Ball>,
     gravity: f64,
     mass_calculation: bool,
     show_trails: bool,
     is_paused: bool,
     implementation: Implementation,
     speed: f64,
-    max_bobs: usize,
+    max_balls: usize,
 }
 #[wasm_bindgen]
 impl Universe {
@@ -186,37 +186,37 @@ impl Universe {
         // self.y_1 = self.origin_y + self.length_rod_1 * math.cos(self.theta_1)
         // self.x_2 = self.x_1 + self.length_rod_2 * math.sin(self.theta_2)
         // self.y_2 = self.y_1 + self.length_rod_2 * math.cos(self.theta_2)
-        let bob1 = Bob::new(100.0, 0.0, 0.0, PI / 2.0, 100.0, 10.0, 0x0f0f0f, 10, 10.0, 0xff0000);
-        let bob2 = Bob::new(200.0, 0.0, 0.0, PI / 2.0, 100.0, 10.0, 0x0f0f0f, 10, 10.0, 0x0000ff);
+        let ball1 = Ball::new(100.0, 0.0, 0.0, PI / 2.0, 100.0, 10.0, 0x0f0f0f, 10, 10.0, 0xff0000);
+        let ball2 = Ball::new(200.0, 0.0, 0.0, PI / 2.0, 100.0, 10.0, 0x0f0f0f, 10, 10.0, 0x0000ff);
         Universe {
-            bobs: vec![bob1, bob2],
+            balls: vec![ball1, ball2],
             gravity: 9.8,
             implementation: Implementation::Euler,
             speed: 1.0 / 20.0,
             mass_calculation: false,
             show_trails: true,
-            max_bobs: 100,
+            max_balls: 100,
             is_paused: false,
         }
     }
     pub fn time_step(&mut self, dt: f64) -> u8 {
-        if self.bobs.is_empty() || self.is_paused {
+        if self.balls.is_empty() || self.is_paused {
             return 1;
         }
 
-        if self.bobs.len() > self.max_bobs {
+        if self.balls.len() > self.max_balls {
             // cutoff for Euler method, remove extras
-            self.bobs.truncate(self.max_bobs);
+            self.balls.truncate(self.max_balls);
         }
         let new_dt = dt * self.speed * (if self.mass_calculation { 2.0 } else { 0.25 });
         if self.implementation == Implementation::Euler {
             let thetas: DVector<f64> = DVector::from_iterator(
-                self.bobs.len(),
-                self.bobs.iter().map(|bob| bob.theta)
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.theta)
             );
             let theta_dots: DVector<f64> = DVector::from_iterator(
-                self.bobs.len(),
-                self.bobs.iter().map(|bob| bob.omega)
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.omega)
             );
 
             // Calculate accelerations using the matrix method
@@ -228,28 +228,28 @@ impl Universe {
             }
 
             // Euler integration: update velocities and positions
-            for i in 0..self.bobs.len() {
-                self.bobs[i].omega += theta_ddots[i] * new_dt;
-                self.bobs[i].theta += self.bobs[i].omega * new_dt;
+            for i in 0..self.balls.len() {
+                self.balls[i].omega += theta_ddots[i] * new_dt;
+                self.balls[i].theta += self.balls[i].omega * new_dt;
 
                 // Calculate positions (cumulative from origin)
                 let mut x = 0.0;
                 let mut y = 0.0;
                 for j in 0..=i {
-                    x += self.bobs[j].rod.length * f64::sin(self.bobs[j].theta);
-                    y += self.bobs[j].rod.length * f64::cos(self.bobs[j].theta);
+                    x += self.balls[j].rod.length * f64::sin(self.balls[j].theta);
+                    y += self.balls[j].rod.length * f64::cos(self.balls[j].theta);
                 }
-                self.bobs[i].pos.x = x;
-                self.bobs[i].pos.y = y;
+                self.balls[i].pos.x = x;
+                self.balls[i].pos.y = y;
             }
         } else if self.implementation == Implementation::RK4 {
             let thetas: DVector<f64> = DVector::from_iterator(
-                self.bobs.len(),
-                self.bobs.iter().map(|bob| bob.theta)
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.theta)
             );
             let theta_dots: DVector<f64> = DVector::from_iterator(
-                self.bobs.len(),
-                self.bobs.iter().map(|bob| bob.omega)
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.omega)
             );
 
             let k1 = self.calculate_accelerations(&thetas, &theta_dots);
@@ -269,27 +269,27 @@ impl Universe {
             // Calculate deltas: (k1 + 2*k2 + 2*k3 + k4) * dt/6
             let theta_deltas = (&k1.0 + &k2.0 * 2.0 + &k3.0 * 2.0 + &k4.0) * (new_dt / 6.0);
             let theta_dot_deltas = (&k1.1 + &k2.1 * 2.0 + &k3.1 * 2.0 + &k4.1) * (new_dt / 6.0);
-            // Update bobs
-            for i in 0..self.bobs.len() {
-                self.bobs[i].theta += theta_deltas[i];
-                self.bobs[i].omega += theta_dot_deltas[i];
+            // Update balls
+            for i in 0..self.balls.len() {
+                self.balls[i].theta += theta_deltas[i];
+                self.balls[i].omega += theta_dot_deltas[i];
 
                 // Calculate positions (cumulative from origin)
                 let mut x = 0.0;
                 let mut y = 0.0;
                 for j in 0..=i {
-                    x += self.bobs[j].rod.length * f64::sin(self.bobs[j].theta);
-                    y += self.bobs[j].rod.length * f64::cos(self.bobs[j].theta);
+                    x += self.balls[j].rod.length * f64::sin(self.balls[j].theta);
+                    y += self.balls[j].rod.length * f64::cos(self.balls[j].theta);
                 }
-                self.bobs[i].pos.x = x;
-                self.bobs[i].pos.y = y;
+                self.balls[i].pos.x = x;
+                self.balls[i].pos.y = y;
             }
         } else if self.implementation == Implementation::Hamiltonian {
             // Placeholder for Hamiltonian method
         }
         if self.show_trails {
-            for bob in &mut self.bobs {
-                bob.add_trail_point(bob.pos, bob.color, 250);
+            for ball in &mut self.balls {
+                ball.add_trail_point(ball.pos, ball.color, 250);
             }
         }
         return 0;
@@ -299,17 +299,17 @@ impl Universe {
         thetas: &DVector<f64>,
         theta_dots: &DVector<f64>
     ) -> (DVector<f64>, DVector<f64>) {
-        let n = self.bobs.len();
+        let n = self.balls.len();
 
         if self.mass_calculation {
             // Extract masses and lengths
-            let masses: Vec<f64> = self.bobs
+            let masses: Vec<f64> = self.balls
                 .iter()
-                .map(|bob| bob.mass)
+                .map(|ball| ball.mass)
                 .collect();
-            let lengths: Vec<f64> = self.bobs
+            let lengths: Vec<f64> = self.balls
                 .iter()
-                .map(|bob| bob.rod.length)
+                .map(|ball| ball.rod.length)
                 .collect();
 
             // Build the mass matrix M
@@ -385,7 +385,7 @@ impl Universe {
     pub fn reset(&mut self) {
         *self = Universe::new();
     }
-    pub fn add_bob(
+    pub fn add_ball(
         &mut self,
         px: f64,
         py: f64,
@@ -398,7 +398,7 @@ impl Universe {
         mass: f64,
         color: u32
     ) {
-        self.bobs.push(Bob::new(px, py, omega, theta, rl, rm, rc, radius, mass, color));
+        self.balls.push(Ball::new(px, py, omega, theta, rl, rm, rc, radius, mass, color));
     }
 
     pub fn random_color() -> u32 {
@@ -406,24 +406,24 @@ impl Universe {
         let colors = [0xff0000, 0x0000ff, 0x00ff00, 0xf0f000, 0x00f0f0, 0xf000f0];
         colors[rand::rng().random_range(0..colors.len())]
     }
-    pub fn add_bob_simple(&mut self, theta: f64) {
+    pub fn add_ball_simple(&mut self, theta: f64) {
         let default_length = 100.0;
         let default_mass = 10.0;
         let default_color = Self::random_color();
         let default_rod_color = 0x0f0f0f;
 
-        // Calculate position from previous bob or origin
-        let (px, py) = if let Some(last_bob) = self.bobs.last() {
+        // Calculate position from previous ball or origin
+        let (px, py) = if let Some(last_ball) = self.balls.last() {
             (
-                last_bob.pos.x + default_length * f64::sin(theta),
-                last_bob.pos.y + default_length * f64::cos(theta),
+                last_ball.pos.x + default_length * f64::sin(theta),
+                last_ball.pos.y + default_length * f64::cos(theta),
             )
         } else {
             (default_length * f64::sin(theta), default_length * f64::cos(theta))
         };
 
-        self.bobs.push(
-            Bob::new(
+        self.balls.push(
+            Ball::new(
                 px,
                 py,
                 0.0,
@@ -437,78 +437,78 @@ impl Universe {
             )
         );
     }
-    pub fn remove_bob(&mut self) {
-        self.bobs.pop();
+    pub fn remove_ball(&mut self) {
+        self.balls.pop();
     }
-    pub fn get_bobs(&self) -> JsValue {
-        serde_wasm_bindgen::to_value(&self.bobs).unwrap()
-    }
-
-    pub fn get_bob(&self, index: usize) -> Option<Bob> {
-        self.bobs.get(index).cloned()
-    }
-    pub fn get_bob_count(&self) -> i32 {
-        self.bobs.len() as i32
+    pub fn get_balls(&self) -> JsValue {
+        serde_wasm_bindgen::to_value(&self.balls).unwrap()
     }
 
-    pub fn update_bob_theta(&mut self, index: usize, theta: f64) {
-        if index < self.bobs.len() {
-            self.bobs[index].theta = theta;
+    pub fn get_ball(&self, index: usize) -> Option<Ball> {
+        self.balls.get(index).cloned()
+    }
+    pub fn get_ball_count(&self) -> i32 {
+        self.balls.len() as i32
+    }
 
-            // Recalculate positions for this bob and all subsequent bobs
-            for i in index..self.bobs.len() {
+    pub fn update_ball_theta(&mut self, index: usize, theta: f64) {
+        if index < self.balls.len() {
+            self.balls[index].theta = theta;
+
+            // Recalculate positions for this ball and all subsequent balls
+            for i in index..self.balls.len() {
                 let (mut x, mut y) = if i == 0 {
                     (0.0, 0.0)
                 } else {
-                    (self.bobs[i - 1].pos.x, self.bobs[i - 1].pos.y)
+                    (self.balls[i - 1].pos.x, self.balls[i - 1].pos.y)
                 };
 
-                x += self.bobs[i].rod.length * f64::sin(self.bobs[i].theta);
-                y += self.bobs[i].rod.length * f64::cos(self.bobs[i].theta);
+                x += self.balls[i].rod.length * f64::sin(self.balls[i].theta);
+                y += self.balls[i].rod.length * f64::cos(self.balls[i].theta);
 
-                self.bobs[i].pos.x = x;
-                self.bobs[i].pos.y = y;
+                self.balls[i].pos.x = x;
+                self.balls[i].pos.y = y;
             }
         }
     }
 
-    pub fn update_bob_length(&mut self, index: usize, length: f64) {
-        if index < self.bobs.len() {
-            self.bobs[index].rod.length = length;
-            // Recalculate positions for this bob and all subsequent bobs
-            self.update_bob_theta(index, self.bobs[index].theta);
+    pub fn update_ball_length(&mut self, index: usize, length: f64) {
+        if index < self.balls.len() {
+            self.balls[index].rod.length = length;
+            // Recalculate positions for this ball and all subsequent balls
+            self.update_ball_theta(index, self.balls[index].theta);
         }
     }
 
-    pub fn update_bob_mass(&mut self, index: usize, mass: f64) {
-        if index < self.bobs.len() {
-            self.bobs[index].mass = mass;
+    pub fn update_ball_mass(&mut self, index: usize, mass: f64) {
+        if index < self.balls.len() {
+            self.balls[index].mass = mass;
         }
     }
 
-    pub fn update_bob_color(&mut self, index: usize, color: u32) {
-        if index < self.bobs.len() {
-            self.bobs[index].color = color;
+    pub fn update_ball_color(&mut self, index: usize, color: u32) {
+        if index < self.balls.len() {
+            self.balls[index].color = color;
         }
     }
 
-    pub fn update_bob_radius(&mut self, index: usize, radius: i32) {
-        if index < self.bobs.len() {
-            self.bobs[index].radius = radius;
+    pub fn update_ball_radius(&mut self, index: usize, radius: i32) {
+        if index < self.balls.len() {
+            self.balls[index].radius = radius;
         }
     }
 
-    pub fn update_bob_omega(&mut self, index: usize, omega: f64) {
-        if index < self.bobs.len() {
-            self.bobs[index].omega = omega;
+    pub fn update_ball_omega(&mut self, index: usize, omega: f64) {
+        if index < self.balls.len() {
+            self.balls[index].omega = omega;
         }
     }
 
     pub fn get_trails(&self) -> JsValue {
         if self.show_trails {
-            let trails: Vec<Vec<Trail>> = self.bobs
+            let trails: Vec<Vec<Trail>> = self.balls
                 .iter()
-                .map(|bob| bob.trail.clone())
+                .map(|ball| ball.trail.clone())
                 .collect();
             serde_wasm_bindgen::to_value(&trails).unwrap()
         } else {

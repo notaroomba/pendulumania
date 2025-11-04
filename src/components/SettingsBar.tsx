@@ -92,32 +92,46 @@ export default function SettingsBar() {
   };
 
   return (
-    <div className="w-fit py-2 px-4 bg-white border pointer-events-auto border-gray-200 rounded-lg shadow-xl">
-      <div className="flex items-center justify-center divide-x  divide-gray-300">
-        <div className="flex items-center gap-2 px-4">
-          <button
-            onClick={() => setImplementation(Implementation.Euler)}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 ${
-              implementation === Implementation.Euler
-                ? "bg-blue-100"
-                : "hover:bg-gray-100"
-            }`}
-            title="Euler Method"
-          >
-            <Calculator className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setImplementation(Implementation.RK4)}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 ${
-              implementation === Implementation.RK4
-                ? "bg-blue-100"
-                : "hover:bg-gray-100"
-            }`}
-            title="RK4 Method"
-          >
-            <ChartScatter className="w-5 h-5" />
-          </button>
-          {/* <button
+    <div className="flex flex-col items-center gap-2">
+      {/* Edit Mode Indicator */}
+      {isPaused && (
+        <div className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg pointer-events-auto text-center animate-pulse">
+          <p className="font-semibold text-sm sm:text-base">
+            🎯 Edit Mode Active
+          </p>
+          <p className="text-xs sm:text-sm opacity-90">
+            Click on a ball to edit its properties
+          </p>
+        </div>
+      )}
+
+      {/* Settings Bar */}
+      <div className="w-fit max-w-full py-2 px-2 sm:px-4 bg-white border pointer-events-auto border-gray-200 rounded-lg shadow-xl overflow-x-auto">
+        <div className="flex items-center justify-center divide-x divide-gray-300 flex-wrap sm:flex-nowrap gap-y-2">
+          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
+            <button
+              onClick={() => setImplementation(Implementation.Euler)}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                implementation === Implementation.Euler
+                  ? "bg-blue-100"
+                  : "hover:bg-gray-100"
+              }`}
+              title="Euler Method"
+            >
+              <Calculator className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => setImplementation(Implementation.RK4)}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                implementation === Implementation.RK4
+                  ? "bg-blue-100"
+                  : "hover:bg-gray-100"
+              }`}
+              title="RK4 Method"
+            >
+              <ChartScatter className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            {/* <button
             onClick={() => setImplementation("hamiltonian")}
             className={`p-2 rounded cursor-pointer ${
               implementation === "hamiltonian"
@@ -128,120 +142,121 @@ export default function SettingsBar() {
           >
             <GraduationCap className="w-5 h-5" />
           </button> */}
-        </div>
-
-        <div className="flex items-center gap-2 px-4">
-          <button
-            onClick={() => {
-              universe.toggle_mass_calculation();
-              setMassCalculation(universe.get_mass_calculation());
-              setRender((prev) => prev + 1);
-            }}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 ${
-              massCalculation ? "bg-blue-100" : "hover:bg-gray-100"
-            }`}
-            title={
-              massCalculation
-                ? "Mass Calculation Enabled"
-                : "Mass Calculation Disabled"
-            }
-          >
-            <Scale className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => {
-              universe.toggle_show_trails();
-              setShowTrails(universe.get_show_trails());
-              setRender((prev) => prev + 1);
-            }}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 ${
-              showTrails ? "bg-blue-100" : "hover:bg-gray-100"
-            }`}
-            title={showTrails ? "Trails Visible" : "Trails Hidden"}
-          >
-            <Sparkles className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 px-4">
-          <div className="w-12 text-center">
-            <p>{multiplier}x</p>
           </div>
-          <button
-            onClick={rewind}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
-            title="Rewind"
-          >
-            <Rewind className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setIsPaused(!isPaused)}
-            className="p-2 hover:bg-gray-100 rounded cursor-pointer transition-all duration-200"
-            title={isPaused ? "Play" : "Pause"}
-          >
-            {isPaused ? (
-              <Play className="w-5 h-5" />
-            ) : (
-              <Pause className="w-5 h-5" />
-            )}
-          </button>
-          <button
-            onClick={fastForward}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
-            title="Fast Forward"
-          >
-            <FastForward className="w-5 h-5" />
-          </button>
-          <button
-            onClick={reset}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
-            title="Reset Simulation"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </button>
-        </div>
 
-        <div className="flex items-center gap-2 px-4">
-          <button
-            onClick={() => {
-              universe.add_bob_simple(Math.PI * 2.0 * Math.random());
-              setRender((prev) => prev + 1);
-            }}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
-            title="Add Bob"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setIsPropertyEditorOpen(!isPropertyEditorOpen)}
-            className={`p-2 hover:bg-gray-100 rounded cursor-pointer transition-all duration-200 ${
-              isPropertyEditorOpen ? "bg-blue-100" : ""
-            }`}
-            title={
-              isPropertyEditorOpen
-                ? "Close Property Editor"
-                : "Open Property Editor"
-            }
-          >
-            <Edit3 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => {
-              universe.remove_bob();
-              setRender((prev) => prev + 1);
-            }}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
-            title="Remove Bob"
-          >
-            <Minus className="w-5 h-5" />
-          </button>
-          <button
-            onClick={resetView}
-            className={`p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
-            title="Reset View"
-          >
-            <Maximize2 className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
+            <button
+              onClick={() => {
+                universe.toggle_mass_calculation();
+                setMassCalculation(universe.get_mass_calculation());
+                setRender((prev) => prev + 1);
+              }}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                massCalculation ? "bg-blue-100" : "hover:bg-gray-100"
+              }`}
+              title={
+                massCalculation
+                  ? "Mass Calculation Enabled"
+                  : "Mass Calculation Disabled"
+              }
+            >
+              <Scale className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => {
+                universe.toggle_show_trails();
+                setShowTrails(universe.get_show_trails());
+                setRender((prev) => prev + 1);
+              }}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                showTrails ? "bg-blue-100" : "hover:bg-gray-100"
+              }`}
+              title={showTrails ? "Trails Visible" : "Trails Hidden"}
+            >
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
+            <div className="w-8 sm:w-12 text-center text-xs sm:text-base">
+              <p>{multiplier}x</p>
+            </div>
+            <button
+              onClick={rewind}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
+              title="Rewind"
+            >
+              <Rewind className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => setIsPaused(!isPaused)}
+              className="p-1.5 sm:p-2 hover:bg-gray-100 rounded cursor-pointer transition-all duration-200"
+              title={isPaused ? "Play" : "Pause"}
+            >
+              {isPaused ? (
+                <Play className="w-4 h-4 sm:w-5 sm:h-5" />
+              ) : (
+                <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
+              )}
+            </button>
+            <button
+              onClick={fastForward}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
+              title="Fast Forward"
+            >
+              <FastForward className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={reset}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
+              title="Reset Simulation"
+            >
+              <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
+            <button
+              onClick={() => {
+                universe.add_ball_simple(Math.PI * 2.0 * Math.random());
+                setRender((prev) => prev + 1);
+              }}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
+              title="Add Ball"
+            >
+              <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => setIsPropertyEditorOpen(!isPropertyEditorOpen)}
+              className={`p-1.5 sm:p-2 hover:bg-gray-100 rounded cursor-pointer transition-all duration-200 ${
+                isPropertyEditorOpen ? "bg-blue-100" : ""
+              }`}
+              title={
+                isPropertyEditorOpen
+                  ? "Close Property Editor"
+                  : "Open Property Editor"
+              }
+            >
+              <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => {
+                universe.remove_ball();
+                setRender((prev) => prev + 1);
+              }}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
+              title="Remove Ball"
+            >
+              <Minus className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={resetView}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 active:bg-blue-200 hover:bg-gray-100`}
+              title="Reset View"
+            >
+              <Maximize2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

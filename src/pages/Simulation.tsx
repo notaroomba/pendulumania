@@ -18,7 +18,7 @@ extend({ Container, Text });
 // Create universe singleton
 const universeInstance: Universe = new Universe();
 
-console.log("Universe initialized:", universeInstance.get_bobs());
+console.log("Universe initialized:", universeInstance.get_balls());
 
 // Memoize the canvas to prevent re-renders from context changes
 const PixiCanvas = memo(function PixiCanvas({
@@ -53,12 +53,12 @@ function SimulationContent() {
   return (
     <Transitions>
       <PixiCanvas universe={universe} />
-      <div className="absolute inset-0 p-4 pointer-events-none flex justify-center items-start">
-        <p className="text-neutral-700 font-bold text-5xl">
+      <div className="absolute inset-0 p-2 sm:p-4 pointer-events-none flex justify-center items-start">
+        <p className="text-neutral-700 font-bold text-4xl md:text-5xl  text-center">
           Pendulum Simulation
         </p>
       </div>
-      <div className="absolute bottom-0 w-screen p-4 pointer-events-none flex justify-center items-start ">
+      <div className="absolute bottom-0 w-screen p-2 sm:p-4 pointer-events-none flex justify-center items-start">
         <SettingsBar />
       </div>
 

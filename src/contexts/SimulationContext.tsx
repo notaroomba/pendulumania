@@ -6,8 +6,8 @@ interface SimulationContextType {
   universe: Universe;
   render: number;
   setRender: React.Dispatch<React.SetStateAction<number>>;
-  selectedBobIndex: number | null;
-  setSelectedBobIndex: (index: number | null) => void;
+  selectedballIndex: number | null;
+  setSelectedballIndex: (index: number | null) => void;
   isPropertyEditorOpen: boolean;
   setIsPropertyEditorOpen: (open: boolean) => void;
 }
@@ -34,7 +34,9 @@ export function SimulationProvider({
   universe,
 }: SimulationProviderProps) {
   const [render, setRender] = useState(0);
-  const [selectedBobIndex, setSelectedBobIndex] = useState<number | null>(null);
+  const [selectedballIndex, setSelectedballIndex] = useState<number | null>(
+    null
+  );
   const [isPropertyEditorOpen, setIsPropertyEditorOpen] = useState(false);
 
   return (
@@ -43,8 +45,8 @@ export function SimulationProvider({
         universe,
         render,
         setRender,
-        selectedBobIndex,
-        setSelectedBobIndex,
+        selectedballIndex,
+        setSelectedballIndex,
         isPropertyEditorOpen,
         setIsPropertyEditorOpen,
       }}

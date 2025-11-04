@@ -1,4 +1,4 @@
-import { Bob, Rod } from "physics-engine";
+import { Ball, Rod } from "physics-engine";
 
 export interface SandboxProps {
   random: boolean;
@@ -7,7 +7,7 @@ export interface SandboxProps {
   count: number;
 }
 export interface BatchGraphicsProps {
-  bobs: Array<Bob>;
+  balls: Array<Ball>;
   rods: Array<Rod>;
 }
 
