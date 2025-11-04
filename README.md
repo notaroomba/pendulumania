@@ -19,7 +19,7 @@
 
 </div>
 
-A small, interactive double pendulum demo that separates a high-performance physics engine (written in Rust and compiled to WASM) from a responsive web UI (React + TypeScript), using Ant Design for UI components and PixiJS for high-performance canvas rendering.
+A small, interactive double pendulum demo that separates a high-performance physics engine (written in Rust and compiled to WASM) from a responsive web UI (React + TypeScript), and PixiJS for high-performance canvas rendering.
 
 <p align="center">
   <a href="https://pendulum.notaroomba.dev">Live demo · pendulum.notaroomba.dev</a>
