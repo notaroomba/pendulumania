@@ -158,9 +158,10 @@ impl Ball {
 #[wasm_bindgen]
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub enum Implementation {
-    Euler, // only 2nd order for now
+    Euler,
     RK4,
-    Hamiltonian,
+    Verlet, // Verlet integration (position-based)
+    Leapfrog, // Leapfrog integration (velocity half-steps)
 }
 
 #[wasm_bindgen]
@@ -174,6 +175,9 @@ pub struct Universe {
     implementation: Implementation,
     speed: f64,
     max_balls: usize,
+    initial_energy: f64,
+    default_mass: f64,
+    limit_total_energy: bool,
 }
 #[wasm_bindgen]
 impl Universe {
@@ -188,16 +192,23 @@ impl Universe {
         // self.y_2 = self.y_1 + self.length_rod_2 * math.cos(self.theta_2)
         let ball1 = Ball::new(100.0, 0.0, 0.0, PI / 2.0, 100.0, 10.0, 0x0f0f0f, 10, 10.0, 0xff0000);
         let ball2 = Ball::new(200.0, 0.0, 0.0, PI / 2.0, 100.0, 10.0, 0x0f0f0f, 10, 10.0, 0x0000ff);
-        Universe {
+        let mut universe = Universe {
             balls: vec![ball1, ball2],
             gravity: 9.8,
             implementation: Implementation::Euler,
             speed: 1.0 / 20.0,
-            mass_calculation: false,
+            mass_calculation: true,
             show_trails: true,
             max_balls: 100,
             is_paused: false,
-        }
+            initial_energy: 0.0, // Will be calculated next
+            default_mass: 10.0, // Default mass used when mass_calculation is false
+            limit_total_energy: false, // Enable energy limiting off by default
+        };
+        // Calculate initial total energy (potential + kinetic)
+        universe.initial_energy =
+            universe.calculate_potential_energy() + universe.calculate_kinetic_energy();
+        universe
     }
     pub fn time_step(&mut self, dt: f64) -> u8 {
         if self.balls.is_empty() || self.is_paused {
@@ -208,7 +219,111 @@ impl Universe {
             // cutoff for Euler method, remove extras
             self.balls.truncate(self.max_balls);
         }
-        let new_dt = dt * self.speed * (if self.mass_calculation { 2.0 } else { 0.25 });
+
+        // Calculate the effective speed multiplier
+        let speed_multiplier = self.speed * 2.0;
+
+        // Instead of scaling dt directly (which causes instability at high speeds),
+        // we take multiple smaller steps to maintain numerical stability
+        let steps = (speed_multiplier.abs() * 50.0).ceil().max(1.0) as usize;
+        let sub_dt = (dt * speed_multiplier) / (steps as f64);
+
+        // Perform multiple substeps with smaller dt
+        for _ in 0..steps {
+            let result = self.single_physics_step(sub_dt);
+            if result != 0 {
+                return result; // Early exit if NaN detected
+            }
+        }
+
+        // Add trail points only once per frame (not per substep)
+        if self.show_trails {
+            for ball in &mut self.balls {
+                ball.add_trail_point(ball.pos, ball.color, 250);
+            }
+        }
+        return 0;
+    }
+
+    // Normalize angle to [-PI, PI] range for better floating point precision
+    fn normalize_angle(angle: f64) -> f64 {
+        let mut a = angle % (2.0 * PI);
+        if a > PI {
+            a -= 2.0 * PI;
+        } else if a < -PI {
+            a += 2.0 * PI;
+        }
+        a
+    }
+
+    // Calculate total potential energy of the system
+    // U = -sum(m_i * g * y_i) where y_i is the vertical position of each mass
+    fn calculate_potential_energy(&self) -> f64 {
+        let mut potential = 0.0;
+        let mut y_cumulative = 0.0;
+
+        for i in 0..self.balls.len() {
+            // Vertical position is cumulative (each mass hangs from the previous)
+            y_cumulative += self.balls[i].rod.length * f64::cos(self.balls[i].theta);
+
+            // Potential energy (negative because positive y is down)
+            let mass = if self.mass_calculation { self.balls[i].mass } else { self.default_mass };
+            potential -= mass * self.gravity * y_cumulative;
+        }
+        potential
+    }
+
+    // Calculate total kinetic energy of the system
+    fn calculate_kinetic_energy(&self) -> f64 {
+        let mut kinetic = 0.0;
+
+        for i in 0..self.balls.len() {
+            // For a multi-pendulum, kinetic energy includes contributions from all previous segments
+            let mut vx = 0.0;
+            let mut vy = 0.0;
+
+            for j in 0..=i {
+                vx +=
+                    self.balls[j].rod.length * self.balls[j].omega * f64::cos(self.balls[j].theta);
+                vy +=
+                    -self.balls[j].rod.length * self.balls[j].omega * f64::sin(self.balls[j].theta);
+            }
+
+            let v_squared = vx * vx + vy * vy;
+
+            let mass = if self.mass_calculation { self.balls[i].mass } else { self.default_mass };
+            kinetic += 0.5 * mass * v_squared;
+        }
+        kinetic
+    }
+
+    // Constrain velocities based on energy conservation
+    fn constrain_velocities(&mut self, initial_energy: f64) {
+        let current_potential = self.calculate_potential_energy();
+        let max_kinetic = initial_energy - current_potential;
+
+        // If we have negative kinetic energy, we have a problem
+        if max_kinetic < 0.0 {
+            return;
+        }
+
+        let current_kinetic = self.calculate_kinetic_energy();
+
+        // If kinetic energy exceeds what's possible, scale down velocities
+        if current_kinetic > max_kinetic && current_kinetic > 0.0 {
+            let scale_factor = f64::sqrt(max_kinetic / current_kinetic);
+            for i in 0..self.balls.len() {
+                self.balls[i].omega *= scale_factor;
+            }
+        }
+    }
+
+    // Recalculate and store the initial energy (call after modifying the system)
+    fn update_initial_energy(&mut self) {
+        self.initial_energy = self.calculate_potential_energy() + self.calculate_kinetic_energy();
+    }
+
+    fn single_physics_step(&mut self, dt: f64) -> u8 {
         if self.implementation == Implementation::Euler {
             let thetas: DVector<f64> = DVector::from_iterator(
                 self.balls.len(),
@@ -229,8 +344,11 @@ impl Universe {
 
             // Euler integration: update velocities and positions
             for i in 0..self.balls.len() {
-                self.balls[i].omega += theta_ddots[i] * new_dt;
-                self.balls[i].theta += self.balls[i].omega * new_dt;
+                self.balls[i].omega += theta_ddots[i] * dt;
+                self.balls[i].theta += self.balls[i].omega * dt;
+
+                // Normalize angle to [-PI, PI] for better floating point precision
+                // self.balls[i].theta = Self::normalize_angle(self.balls[i].theta);
 
                 // Calculate positions (cumulative from origin)
                 let mut x = 0.0;
@@ -254,25 +372,28 @@ impl Universe {
 
             let k1 = self.calculate_accelerations(&thetas, &theta_dots);
             let k2 = self.calculate_accelerations(
-                &(thetas.clone() + &k1.0 * (0.5 * new_dt)),
-                &(theta_dots.clone() + &k1.1 * (0.5 * new_dt))
+                &(thetas.clone() + &k1.0 * (0.5 * dt)),
+                &(theta_dots.clone() + &k1.1 * (0.5 * dt))
             );
             let k3 = self.calculate_accelerations(
-                &(thetas.clone() + &k2.0 * (0.5 * new_dt)),
-                &(theta_dots.clone() + &k2.1 * (0.5 * new_dt))
+                &(thetas.clone() + &k2.0 * (0.5 * dt)),
+                &(theta_dots.clone() + &k2.1 * (0.5 * dt))
             );
             let k4 = self.calculate_accelerations(
-                &(thetas.clone() + &k3.0 * (1.0 * new_dt)),
-                &(theta_dots.clone() + &k3.1 * (1.0 * new_dt))
+                &(thetas.clone() + &k3.0 * (1.0 * dt)),
+                &(theta_dots.clone() + &k3.1 * (1.0 * dt))
             );
 
             // Calculate deltas: (k1 + 2*k2 + 2*k3 + k4) * dt/6
-            let theta_deltas = (&k1.0 + &k2.0 * 2.0 + &k3.0 * 2.0 + &k4.0) * (new_dt / 6.0);
-            let theta_dot_deltas = (&k1.1 + &k2.1 * 2.0 + &k3.1 * 2.0 + &k4.1) * (new_dt / 6.0);
+            let theta_deltas = (&k1.0 + &k2.0 * 2.0 + &k3.0 * 2.0 + &k4.0) * (dt / 6.0);
+            let theta_dot_deltas = (&k1.1 + &k2.1 * 2.0 + &k3.1 * 2.0 + &k4.1) * (dt / 6.0);
             // Update balls
             for i in 0..self.balls.len() {
                 self.balls[i].theta += theta_deltas[i];
                 self.balls[i].omega += theta_dot_deltas[i];
+
+                // Normalize angle to [-PI, PI] for better floating point precision
+                // self.balls[i].theta = Self::normalize_angle(self.balls[i].theta);
 
                 // Calculate positions (cumulative from origin)
                 let mut x = 0.0;
@@ -284,14 +405,124 @@ impl Universe {
                 self.balls[i].pos.x = x;
                 self.balls[i].pos.y = y;
             }
-        } else if self.implementation == Implementation::Hamiltonian {
-            // Placeholder for Hamiltonian method
-        }
-        if self.show_trails {
-            for ball in &mut self.balls {
-                ball.add_trail_point(ball.pos, ball.color, 250);
+        } else if self.implementation == Implementation::Verlet {
+            // Verlet integration (position-based with previous and current positions)
+            // Based on: x(t+dt) = x(t) + v(t)*dt + 0.5*a(t)*dt^2
+            // Then: v(t+dt) = 0.5*(a(t) + a(t+dt))*dt
+            let thetas: DVector<f64> = DVector::from_iterator(
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.theta)
+            );
+            let theta_dots: DVector<f64> = DVector::from_iterator(
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.omega)
+            );
+
+            // Calculate current accelerations
+            let (_, theta_ddots) = self.calculate_accelerations(&thetas, &theta_dots);
+
+            if theta_ddots.iter().any(|&x| x.is_nan()) {
+                return 1;
+            }
+
+            // Update positions: theta_new = theta + omega*dt + 0.5*alpha*dt^2
+            let mut new_thetas = DVector::from_element(self.balls.len(), 0.0);
+            for i in 0..self.balls.len() {
+                new_thetas[i] = thetas[i] + theta_dots[i] * dt + 0.5 * theta_ddots[i] * dt * dt;
+            }
+
+            // Calculate new accelerations at new positions
+            let (_, theta_ddots_new) = self.calculate_accelerations(&new_thetas, &theta_dots);
+
+            if theta_ddots_new.iter().any(|&x| x.is_nan()) {
+                return 1;
+            }
+
+            // Update velocities: omega_new = omega + 0.5*(alpha_old + alpha_new)*dt
+            for i in 0..self.balls.len() {
+                self.balls[i].omega =
+                    theta_dots[i] + 0.5 * (theta_ddots[i] + theta_ddots_new[i]) * dt;
+                self.balls[i].theta = new_thetas[i];
+
+                // Normalize angle to [-PI, PI] for better floating point precision
+                self.balls[i].theta = Self::normalize_angle(self.balls[i].theta);
+
+                // Calculate positions (cumulative from origin)
+                let mut x = 0.0;
+                let mut y = 0.0;
+                for j in 0..=i {
+                    x += self.balls[j].rod.length * f64::sin(self.balls[j].theta);
+                    y += self.balls[j].rod.length * f64::cos(self.balls[j].theta);
+                }
+                self.balls[i].pos.x = x;
+                self.balls[i].pos.y = y;
+            }
+        } else if self.implementation == Implementation::Leapfrog {
+            // Leapfrog integration (velocity half-steps)
+            // Based on: v(t+dt/2) = v(t) + a(t)*dt/2
+            //           x(t+dt) = x(t) + v(t+dt/2)*dt
+            //           a(t+dt) = acceleration at new position
+            //           v(t+dt) = v(t+dt/2) + a(t+dt)*dt/2
+            let thetas: DVector<f64> = DVector::from_iterator(
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.theta)
+            );
+            let theta_dots: DVector<f64> = DVector::from_iterator(
+                self.balls.len(),
+                self.balls.iter().map(|ball| ball.omega)
+            );
+
+            // Step 1: Half-step velocity update
+            let (_, theta_ddots) = self.calculate_accelerations(&thetas, &theta_dots);
+
+            // Check for NaN before updating
+            if theta_ddots.iter().any(|&x| x.is_nan()) {
+                return 1;
+            }
+
+            let mut theta_dots_half = theta_dots.clone();
+            for i in 0..self.balls.len() {
+                theta_dots_half[i] += theta_ddots[i] * (dt / 2.0);
+            }
+
+            // Step 2: Full-step position update using half-step velocity
+            let mut new_thetas = thetas.clone();
+            for i in 0..self.balls.len() {
+                new_thetas[i] += theta_dots_half[i] * dt;
+            }
+
+            // Step 3: Calculate accelerations at new position
+            let (_, theta_ddots_new) = self.calculate_accelerations(&new_thetas, &theta_dots_half);
+
+            if theta_ddots_new.iter().any(|&x| x.is_nan()) {
+                return 1;
+            }
+
+            // Step 4: Complete velocity update with second half-step
+            for i in 0..self.balls.len() {
+                self.balls[i].theta = new_thetas[i];
+                self.balls[i].omega = theta_dots_half[i] + theta_ddots_new[i] * (dt / 2.0);
+
+                // Normalize angle to [-PI, PI] for better floating point precision
+                self.balls[i].theta = Self::normalize_angle(self.balls[i].theta);
+
+                // Calculate positions (cumulative from origin)
+                let mut x = 0.0;
+                let mut y = 0.0;
+                for j in 0..=i {
+                    x += self.balls[j].rod.length * f64::sin(self.balls[j].theta);
+                    y += self.balls[j].rod.length * f64::cos(self.balls[j].theta);
+                }
+                self.balls[i].pos.x = x;
+                self.balls[i].pos.y = y;
             }
         }
+
+        // Apply energy conservation constraint to prevent unbounded energy growth (if enabled)
+        if self.limit_total_energy {
+            self.constrain_velocities(self.initial_energy);
+        }
+
         return 0;
     }
     fn calculate_accelerations(
@@ -351,13 +582,22 @@ impl Universe {
 
             (theta_dots.clone(), theta_ddots)
         } else {
-            // Simplified calculation without masses (assumes equal unit masses)
+            // Use default mass for all balls when mass_calculation is false
+            let masses: Vec<f64> = vec![self.default_mass; n];
+            let lengths: Vec<f64> = self.balls
+                .iter()
+                .map(|ball| ball.rod.length)
+                .collect();
+
+            // Build the mass matrix M (same as mass_calculation=true, but with default_mass)
             let mut m: DMatrix<f64> = DMatrix::from_element(n, n, 0.0);
             for i in 0..n {
                 for j in 0..n {
+                    // Sum of masses from max(i,j) to n-1
+                    let mass_sum: f64 = (usize::max(i, j)..n).map(|k| masses[k]).sum();
+
                     m[(i, j)] =
-                        ((n as f64) - f64::max(i as f64, j as f64)) *
-                        f64::cos(thetas[i] - thetas[j]);
+                        mass_sum * lengths[i] * lengths[j] * f64::cos(thetas[i] - thetas[j]);
                 }
             }
 
@@ -365,13 +605,22 @@ impl Universe {
             let mut v = DVector::from_element(n, 0.0);
             for i in 0..n {
                 let mut sum = 0.0;
+
                 for j in 0..n {
+                    let mass_sum: f64 = (usize::max(i, j)..n).map(|k| masses[k]).sum();
+
                     sum -=
-                        ((n as f64) - f64::max(i as f64, j as f64)) *
+                        mass_sum *
+                        lengths[i] *
+                        lengths[j] *
                         f64::sin(thetas[i] - thetas[j]) *
                         f64::powi(theta_dots[j], 2);
                 }
-                sum -= self.gravity * ((n as f64) - (i as f64)) * f64::sin(thetas[i]);
+
+                // Gravitational term
+                let mass_sum_i: f64 = (i..n).map(|k| masses[k]).sum();
+                sum -= self.gravity * mass_sum_i * lengths[i] * f64::sin(thetas[i]);
+
                 v[i] = sum;
             }
 
@@ -399,6 +648,7 @@ impl Universe {
         color: u32
     ) {
         self.balls.push(Ball::new(px, py, omega, theta, rl, rm, rc, radius, mass, color));
+        self.update_initial_energy();
     }
 
     pub fn random_color() -> u32 {
@@ -436,9 +686,11 @@ impl Universe {
                 default_color
             )
         );
+        self.update_initial_energy();
     }
     pub fn remove_ball(&mut self) {
         self.balls.pop();
+        self.update_initial_energy();
     }
     pub fn get_balls(&self) -> JsValue {
         serde_wasm_bindgen::to_value(&self.balls).unwrap()
@@ -469,6 +721,7 @@ impl Universe {
                 self.balls[i].pos.x = x;
                 self.balls[i].pos.y = y;
             }
+            self.update_initial_energy();
         }
     }
 
@@ -477,12 +730,14 @@ impl Universe {
             self.balls[index].rod.length = length;
             // Recalculate positions for this ball and all subsequent balls
             self.update_ball_theta(index, self.balls[index].theta);
+            // update_ball_theta already calls update_initial_energy
         }
     }
 
     pub fn update_ball_mass(&mut self, index: usize, mass: f64) {
         if index < self.balls.len() {
             self.balls[index].mass = mass;
+            self.update_initial_energy();
         }
     }
 
@@ -501,6 +756,7 @@ impl Universe {
     pub fn update_ball_omega(&mut self, index: usize, omega: f64) {
         if index < self.balls.len() {
             self.balls[index].omega = omega;
+            self.update_initial_energy();
         }
     }
 
@@ -566,5 +822,17 @@ impl Universe {
 
     pub fn toggle_show_trails(&mut self) {
         self.show_trails = !self.show_trails;
+    }
+
+    pub fn set_limit_total_energy(&mut self, limit_total_energy: bool) {
+        self.limit_total_energy = limit_total_energy;
+    }
+
+    pub fn get_limit_total_energy(&self) -> bool {
+        return self.limit_total_energy;
+    }
+
+    pub fn toggle_limit_total_energy(&mut self) {
+        self.limit_total_energy = !self.limit_total_energy;
     }
 }

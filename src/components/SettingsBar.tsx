@@ -12,6 +12,9 @@ import {
   Scale,
   Sparkles,
   Maximize2,
+  BookOpen,
+  TrendingUp,
+  Rabbit,
 } from "lucide-react";
 import { Implementation } from "physics-engine";
 import { useEffect, useState } from "react";
@@ -28,6 +31,9 @@ export default function SettingsBar() {
     universe.get_mass_calculation()
   );
   const [showTrails, setShowTrails] = useState(universe.get_show_trails());
+  const [limitTotalEnergy, setLimitTotalEnergy] = useState(
+    universe.get_limit_total_energy()
+  );
 
   const BASE_SPEED = 0.05; // 1x == 0.05
   const multipliers = [-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4];
@@ -67,9 +73,11 @@ export default function SettingsBar() {
 
   const reset = () => {
     const isPaused = universe.get_is_paused();
+    const currentLimitEnergy = universe.get_limit_total_energy();
     universe.reset();
     universe.set_is_paused(isPaused);
     universe.set_mass_calculation(massCalculation);
+    universe.set_limit_total_energy(currentLimitEnergy);
     setMultiplier(1);
     universe.set_speed(1 * BASE_SPEED);
     setImplementation(implementation);
@@ -131,17 +139,28 @@ export default function SettingsBar() {
             >
               <ChartScatter className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-            {/* <button
-            onClick={() => setImplementation("hamiltonian")}
-            className={`p-2 rounded cursor-pointer ${
-              implementation === "hamiltonian"
-                ? "bg-blue-100"
-                : "hover:bg-gray-100"
-            }`}
-            title="Hamiltonian Method"
-          >
-            <GraduationCap className="w-5 h-5" />
-          </button> */}
+            <button
+              onClick={() => setImplementation(Implementation.Verlet)}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                implementation === Implementation.Verlet
+                  ? "bg-blue-100"
+                  : "hover:bg-gray-100"
+              }`}
+              title="Verlet Method"
+            >
+              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => setImplementation(Implementation.Leapfrog)}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                implementation === Implementation.Leapfrog
+                  ? "bg-blue-100"
+                  : "hover:bg-gray-100"
+              }`}
+              title="Leapfrog Method"
+            >
+              <Rabbit className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
@@ -174,6 +193,23 @@ export default function SettingsBar() {
               title={showTrails ? "Trails Visible" : "Trails Hidden"}
             >
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={() => {
+                universe.toggle_limit_total_energy();
+                setLimitTotalEnergy(universe.get_limit_total_energy());
+                setRender((prev) => prev + 1);
+              }}
+              className={`p-1.5 sm:p-2 rounded cursor-pointer transition-all duration-200 ${
+                limitTotalEnergy ? "bg-blue-100" : "hover:bg-gray-100"
+              }`}
+              title={
+                limitTotalEnergy
+                  ? "Energy Limiting Enabled"
+                  : "Energy Limiting Disabled"
+              }
+            >
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
